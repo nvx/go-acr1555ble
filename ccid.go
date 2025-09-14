@@ -6,25 +6,31 @@ import (
 	"errors"
 )
 
+type ccidMessageType byte
+
 const (
-	commandSetParameters byte = 0x61
-	commandICCPowerOn    byte = 0x62
-	commandICCPowerOff   byte = 0x63
-	commandGetSlotStatus byte = 0x65
-	commandXfrBlock      byte = 0x6F
-	commandEscape        byte = 0x6B
+	commandSetParameters ccidMessageType = 0x61
+	commandICCPowerOn    ccidMessageType = 0x62
+	commandICCPowerOff   ccidMessageType = 0x63
+	commandGetSlotStatus ccidMessageType = 0x65
+	commandXfrBlock      ccidMessageType = 0x6F
+	commandEscape        ccidMessageType = 0x6B
 )
 
 const (
-	responseError      byte = 0x53
-	responseDataBlock  byte = 0x80
-	responseSlotStatus byte = 0x81
-	responseParameters byte = 0x82
-	responseEscape     byte = 0x83
+	responseError      ccidMessageType = 0x53
+	responseDataBlock  ccidMessageType = 0x80
+	responseSlotStatus ccidMessageType = 0x81
+	responseParameters ccidMessageType = 0x82
+	responseEscape     ccidMessageType = 0x83
+)
+
+const (
+	ccidMaxBlockDataSize = 0x1E7
 )
 
 type ccidMessage struct {
-	messageType byte
+	messageType ccidMessageType
 	slotIsSAM   bool
 	seq         byte
 	headerData  [3]byte
@@ -47,7 +53,7 @@ func (c ccidMessage) MarshalBinary() (_ []byte, err error) {
 	buf := make([]byte, 0, 10+len(c.data))
 
 	// 0
-	buf = append(buf, c.messageType)
+	buf = append(buf, byte(c.messageType))
 	// 1-4
 	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(c.data)))
 
@@ -95,7 +101,7 @@ func (c *ccidMessage) UnmarshalBinary(data []byte) (err error) {
 		return
 	}
 
-	c.messageType = data[0]
+	c.messageType = ccidMessageType(data[0])
 	c.seq = data[6]
 	c.headerData = [3]byte{data[7], data[8], data[9]}
 

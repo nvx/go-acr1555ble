@@ -9,8 +9,8 @@ import (
 type payload struct {
 	slotIsSAM    bool
 	totalDataLen uint16
-	hostSeq      uint8
-	readerSeq    uint8
+	hostSeq      byte
+	readerSeq    byte
 	data         []byte
 }
 
