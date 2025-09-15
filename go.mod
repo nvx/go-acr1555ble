@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/ansel1/merry/v2 v2.2.2
-	github.com/stretchr/testify v1.8.3
+	github.com/stretchr/testify v1.11.1
 	tinygo.org/x/bluetooth v0.13.0
 )
 

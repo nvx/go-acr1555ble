@@ -18,8 +18,8 @@ func iccPowerOnMessage(slotIsSAM bool, seq, powerSelect byte) ccidMessage {
 func (b *ACR1555BLE) ICCPowerOn(ctx context.Context, sam bool, powerSelect PowerSelect) (_ []byte, err error) {
 	defer deferWrap(&err)
 
-	msg := iccPowerOnMessage(sam, b.seq, byte(powerSelect))
-	b.seq++
+	msg := iccPowerOnMessage(sam, b.ccidSeq, byte(powerSelect))
+	b.ccidSeq++
 
 	res, err := b.exchangeCCID(ctx, msg)
 	if err != nil {
@@ -51,8 +51,8 @@ func iccPowerOffMessage(slotIsSAM bool, seq byte) ccidMessage {
 func (b *ACR1555BLE) ICCPowerOff(ctx context.Context, sam bool) (_ SlotStatus, err error) {
 	defer deferWrap(&err)
 
-	msg := iccPowerOffMessage(sam, b.seq)
-	b.seq++
+	msg := iccPowerOffMessage(sam, b.ccidSeq)
+	b.ccidSeq++
 
 	return b.sendMessageWithSlotStatusResponse(ctx, msg)
 }
@@ -68,8 +68,8 @@ func getSlotStatusMessage(slotIsSAM bool, seq byte) ccidMessage {
 func (b *ACR1555BLE) GetSlotStatus(ctx context.Context, sam bool) (_ SlotStatus, err error) {
 	defer deferWrap(&err)
 
-	msg := getSlotStatusMessage(sam, b.seq)
-	b.seq++
+	msg := getSlotStatusMessage(sam, b.ccidSeq)
+	b.ccidSeq++
 
 	return b.sendMessageWithSlotStatusResponse(ctx, msg)
 }
@@ -103,8 +103,8 @@ func (b *ACR1555BLE) XfrBlock(ctx context.Context, sam bool, bwi byte, data []by
 
 		n := min(len(data), ccidMaxBlockDataSize)
 
-		msg := xfrBlockMessage(sam, b.seq, bwi, levelParameter, data[:n])
-		b.seq++
+		msg := xfrBlockMessage(sam, b.ccidSeq, bwi, levelParameter, data[:n])
+		b.ccidSeq++
 
 		var res ccidMessage
 		res, err = b.exchangeCCID(ctx, msg)
@@ -159,8 +159,8 @@ func escapeMessage(slotIsSAM bool, seq byte, data []byte) ccidMessage {
 func (b *ACR1555BLE) Escape(ctx context.Context, sam bool, data []byte) (_ []byte, err error) {
 	defer deferWrap(&err)
 
-	msg := escapeMessage(sam, b.seq, data)
-	b.seq++
+	msg := escapeMessage(sam, b.ccidSeq, data)
+	b.ccidSeq++
 	data = nil
 
 	res, err := b.exchangeCCID(ctx, msg)
@@ -217,8 +217,8 @@ func setParametersMessage(slotIsSAM bool, seq byte, isT1 bool, fiDi, tccks, guar
 func (b *ACR1555BLE) SetParameters(ctx context.Context, sam bool, isT1 bool, fiDi, tccks, guardTime, waiting, clockStop, ifsc byte) (err error) {
 	defer deferWrap(&err)
 
-	msg := setParametersMessage(sam, b.seq, isT1, fiDi, tccks, guardTime, waiting, clockStop, ifsc)
-	b.seq++
+	msg := setParametersMessage(sam, b.ccidSeq, isT1, fiDi, tccks, guardTime, waiting, clockStop, ifsc)
+	b.ccidSeq++
 
 	res, err := b.exchangeCCID(ctx, msg)
 	if err != nil {

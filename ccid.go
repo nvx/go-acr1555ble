@@ -26,7 +26,8 @@ const (
 )
 
 const (
-	ccidMaxBlockDataSize = 0x1E7
+	// in theory the docs indicate this should be 0x1E7, but in practice anything over 0xE2 fails
+	ccidMaxBlockDataSize = 0xE2
 )
 
 type ccidMessage struct {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sync"
 	"tinygo.org/x/bluetooth"
 )
 
@@ -19,10 +20,15 @@ type ACR1555BLE struct {
 	charCommandReq   *bluetooth.DeviceCharacteristic
 	charCommandRes   *bluetooth.DeviceCharacteristic
 	charNotification *bluetooth.DeviceCharacteristic
+	mtu              int
 
-	seq byte
+	ccidSeq byte
 
-	piccResponse, samResponse chan ccidMessage
+	bleSeqLock         sync.Mutex
+	hostSeq, readerSeq byte
+
+	piccResponse, samResponse       chan ccidMessage
+	piccChainingBuf, samChainingBuf []byte
 }
 
 func New(ctx context.Context, adapter *bluetooth.Adapter, address bluetooth.Address) (_ *ACR1555BLE, err error) {
@@ -84,6 +90,13 @@ func New(ctx context.Context, adapter *bluetooth.Adapter, address bluetooth.Addr
 		return
 	}
 
+	mtu, err := b.charCommandReq.GetMTU()
+	if err != nil {
+		return
+	}
+
+	b.mtu = int(mtu)
+
 	err = b.charCommandRes.EnableNotifications(b.commandResCallback(ctx))
 	if err != nil {
 		return
@@ -117,20 +130,42 @@ func (b *ACR1555BLE) exchangeCCID(ctx context.Context, msg ccidMessage) (_ ccidM
 		return
 	}
 
-	p, err := payload{
-		slotIsSAM:    msg.slotIsSAM,
-		totalDataLen: uint16(len(d)),
-		hostSeq:      msg.seq,
-		readerSeq:    msg.seq,
-		data:         d,
-	}.MarshalBinary()
-	if err != nil {
+	if len(d) > 0xFFFF {
+		err = errors.New("ccid message too large")
 		return
 	}
 
-	err = b.write(p)
-	if err != nil {
-		return
+	// GATT opcode (1) handle (2) payload wrapping (9)
+	maxPayloadSize := b.mtu - 1 - 2 - 9
+	totalDataLen := uint16(len(d))
+
+	for len(d) > 0 {
+		b.bleSeqLock.Lock()
+		hostSeq := b.hostSeq
+		readerSeq := b.readerSeq
+		b.hostSeq++
+		b.bleSeqLock.Unlock()
+
+		n := min(maxPayloadSize, len(d))
+
+		var p []byte
+		p, err = payload{
+			slotIsSAM:    msg.slotIsSAM,
+			totalDataLen: totalDataLen,
+			hostSeq:      hostSeq,
+			readerSeq:    readerSeq,
+			data:         d[:n],
+		}.MarshalBinary()
+		if err != nil {
+			return
+		}
+
+		d = d[n:]
+
+		err = b.write(p)
+		if err != nil {
+			return
+		}
 	}
 
 	return b.waitForResponse(ctx, msg.slotIsSAM)
@@ -160,19 +195,59 @@ func (b *ACR1555BLE) commandResCallback(ctx context.Context) func([]byte) {
 		var res payload
 		err := res.UnmarshalBinary(d)
 		if err != nil {
-			slog.ErrorContext(ctx, "Error unmarshalling BLE response payload", slog.String("error", err.Error()))
+			slog.ErrorContext(ctx, "Error unmarshalling BLE response payload", slog.String("error", err.Error()), logHex("ble_payload", d))
 			return
 		}
 
+		b.bleSeqLock.Lock()
+		b.readerSeq++
+		b.bleSeqLock.Unlock()
+
+		data := res.data
+
+		totalDataLen := int(res.totalDataLen)
+		if totalDataLen != len(data) {
+			if res.slotIsSAM {
+				b.samChainingBuf = bleChain(ctx, data, b.samChainingBuf, totalDataLen)
+				if len(b.samChainingBuf) != totalDataLen {
+					return
+				}
+				data = b.samChainingBuf
+				b.samChainingBuf = nil
+			} else {
+				b.piccChainingBuf = bleChain(ctx, data, b.piccChainingBuf, totalDataLen)
+				if len(b.piccChainingBuf) != totalDataLen {
+					return
+				}
+				data = b.piccChainingBuf
+				b.piccChainingBuf = nil
+			}
+		}
+
 		var msg ccidMessage
-		err = msg.UnmarshalBinary(res.data)
+		err = msg.UnmarshalBinary(data)
 		if err != nil {
-			slog.ErrorContext(ctx, "Error unmarshalling CCID response message", slog.String("error", err.Error()))
+			slog.ErrorContext(ctx, "Error unmarshalling CCID response message", slog.String("error", err.Error()), logHex("ble_payload", d), logHex("ccid_payload", data))
 			return
 		}
 
 		b.responseChan(res.slotIsSAM) <- msg
 	}
+}
+
+func bleChain(ctx context.Context, data, chainingBuf []byte, totalDataLen int) []byte {
+	if chainingBuf == nil {
+		chainingBuf = make([]byte, 0, totalDataLen)
+	} else if cap(chainingBuf) != totalDataLen {
+		slog.ErrorContext(ctx, "chaining total length changed")
+		return nil
+	}
+	chainingBuf = append(chainingBuf, data...)
+	if len(chainingBuf) > totalDataLen {
+		slog.ErrorContext(ctx, "chaining buffer overflow")
+		return nil
+	}
+	return chainingBuf
 }
 
 func (b *ACR1555BLE) cardNotificationCallback(ctx context.Context) func([]byte) {
