@@ -1,9 +1,11 @@
 package acr1555ble
 
 import (
+	"context"
 	"encoding"
 	"encoding/binary"
 	"errors"
+	"github.com/nvx/go-rfid"
 )
 
 type payload struct {
@@ -25,7 +27,7 @@ const (
 )
 
 func (p payload) MarshalBinary() (_ []byte, err error) {
-	defer deferWrap(&err)
+	defer rfid.DeferWrap(context.Background(), &err)
 
 	if len(p.data) > int(p.totalDataLen) {
 		err = errors.New("data larger than total data length")
@@ -65,7 +67,7 @@ func (p payload) MarshalBinary() (_ []byte, err error) {
 }
 
 func (p *payload) UnmarshalBinary(data []byte) (err error) {
-	defer deferWrap(&err)
+	defer rfid.DeferWrap(context.Background(), &err)
 
 	if len(data) < 9 || data[0] != startByte || data[len(data)-1] != stopByte || xor8(data[1:len(data)-2]) != data[len(data)-2] {
 		err = errors.New("corrupt payload")

@@ -3,16 +3,17 @@ package acr1555ble
 import (
 	"context"
 	"errors"
+	"github.com/nvx/go-rfid"
 	"log/slog"
 	"sync"
 	"tinygo.org/x/bluetooth"
 )
 
 var (
-	acr1555ServiceUUID          = must(bluetooth.ParseUUID(`00003970-817C-48DF-8DB2-476A8134EDE0`))
-	acr1555CharCommandReqUUID   = must(bluetooth.ParseUUID(`00003971-817C-48DF-8DB2-476A8134EDE0`))
-	acr1555CharCommandResUUID   = must(bluetooth.ParseUUID(`00003972-817C-48DF-8DB2-476A8134EDE0`))
-	acr1555CharNotificationUUID = must(bluetooth.ParseUUID(`00003973-817C-48DF-8DB2-476A8134EDE0`))
+	acr1555ServiceUUID          = rfid.Must(bluetooth.ParseUUID(`00003970-817C-48DF-8DB2-476A8134EDE0`))
+	acr1555CharCommandReqUUID   = rfid.Must(bluetooth.ParseUUID(`00003971-817C-48DF-8DB2-476A8134EDE0`))
+	acr1555CharCommandResUUID   = rfid.Must(bluetooth.ParseUUID(`00003972-817C-48DF-8DB2-476A8134EDE0`))
+	acr1555CharNotificationUUID = rfid.Must(bluetooth.ParseUUID(`00003973-817C-48DF-8DB2-476A8134EDE0`))
 )
 
 type ACR1555BLE struct {
@@ -32,7 +33,7 @@ type ACR1555BLE struct {
 }
 
 func New(ctx context.Context, adapter *bluetooth.Adapter, address bluetooth.Address) (_ *ACR1555BLE, err error) {
-	defer deferWrap(&err)
+	defer rfid.DeferWrap(ctx, &err)
 
 	device, err := adapter.Connect(address, bluetooth.ConnectionParams{})
 	if err != nil {
@@ -111,19 +112,19 @@ func New(ctx context.Context, adapter *bluetooth.Adapter, address bluetooth.Addr
 }
 
 func (b *ACR1555BLE) Close() (err error) {
-	defer deferWrap(&err)
+	defer rfid.DeferWrap(context.Background(), &err)
 
 	return b.device.Disconnect()
 }
 
-func (b *ACR1555BLE) write(d []byte) (err error) {
-	defer deferWrap(&err)
+func (b *ACR1555BLE) write(ctx context.Context, d []byte) (err error) {
+	defer rfid.DeferWrap(ctx, &err)
 	_, err = b.charCommandReq.WriteWithoutResponse(d)
 	return
 }
 
 func (b *ACR1555BLE) exchangeCCID(ctx context.Context, msg ccidMessage) (_ ccidMessage, err error) {
-	defer deferWrap(&err)
+	defer rfid.DeferWrap(ctx, &err)
 
 	d, err := msg.MarshalBinary()
 	if err != nil {
@@ -162,7 +163,7 @@ func (b *ACR1555BLE) exchangeCCID(ctx context.Context, msg ccidMessage) (_ ccidM
 
 		d = d[n:]
 
-		err = b.write(p)
+		err = b.write(ctx, p)
 		if err != nil {
 			return
 		}
@@ -172,7 +173,7 @@ func (b *ACR1555BLE) exchangeCCID(ctx context.Context, msg ccidMessage) (_ ccidM
 }
 
 func (b *ACR1555BLE) waitForResponse(ctx context.Context, sam bool) (_ ccidMessage, err error) {
-	defer deferWrap(&err)
+	defer rfid.DeferWrap(ctx, &err)
 
 	select {
 	case res := <-b.responseChan(sam):
@@ -195,7 +196,7 @@ func (b *ACR1555BLE) commandResCallback(ctx context.Context) func([]byte) {
 		var res payload
 		err := res.UnmarshalBinary(d)
 		if err != nil {
-			slog.ErrorContext(ctx, "Error unmarshalling BLE response payload", slog.String("error", err.Error()), logHex("ble_payload", d))
+			slog.ErrorContext(ctx, "Error unmarshalling BLE response payload", slog.String("error", err.Error()), rfid.LogHex("ble_payload", d))
 			return
 		}
 
@@ -227,7 +228,7 @@ func (b *ACR1555BLE) commandResCallback(ctx context.Context) func([]byte) {
 		var msg ccidMessage
 		err = msg.UnmarshalBinary(data)
 		if err != nil {
-			slog.ErrorContext(ctx, "Error unmarshalling CCID response message", slog.String("error", err.Error()), logHex("ble_payload", d), logHex("ccid_payload", data))
+			slog.ErrorContext(ctx, "Error unmarshalling CCID response message", slog.String("error", err.Error()), rfid.LogHex("ble_payload", d), rfid.LogHex("ccid_payload", data))
 			return
 		}
 
@@ -252,6 +253,6 @@ func bleChain(ctx context.Context, data, chainingBuf []byte, totalDataLen int) [
 
 func (b *ACR1555BLE) cardNotificationCallback(ctx context.Context) func([]byte) {
 	return func(d []byte) {
-		slog.InfoContext(ctx, "Got card notification", logHex("data", d))
+		slog.InfoContext(ctx, "Got card notification", rfid.LogHex("data", d))
 	}
 }

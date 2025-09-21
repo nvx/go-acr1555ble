@@ -2,6 +2,7 @@ package acr1555ble
 
 import (
 	"context"
+	"github.com/nvx/go-rfid"
 )
 
 type ICCStatus byte
@@ -27,18 +28,12 @@ type SlotStatus struct {
 }
 
 func (b *ACR1555BLE) sendMessageWithSlotStatusResponse(ctx context.Context, msg ccidMessage) (_ SlotStatus, err error) {
-	defer deferWrap(&err)
+	defer rfid.DeferWrap(ctx, &err)
 
 	res, err := b.exchangeCCID(ctx, msg)
 	if err != nil {
 		return
 	}
-
-	return parseSlotStatus(res)
-}
-
-func parseSlotStatus(res ccidMessage) (_ SlotStatus, err error) {
-	defer deferWrap(&err)
 
 	err = ccidCheckResponseMessage(res, responseSlotStatus)
 	if err != nil {

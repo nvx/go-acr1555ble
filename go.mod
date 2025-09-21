@@ -3,7 +3,7 @@ module github.com/nvx/go-acr1555ble
 go 1.25.0
 
 require (
-	github.com/ansel1/merry/v2 v2.2.2
+	github.com/nvx/go-rfid v0.0.1
 	github.com/stretchr/testify v1.11.1
 	tinygo.org/x/bluetooth v0.13.0
 )

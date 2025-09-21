@@ -3,6 +3,7 @@ package acr1555ble
 import (
 	"context"
 	"errors"
+	"github.com/nvx/go-rfid"
 )
 
 const (
@@ -25,7 +26,7 @@ type Card struct {
 }
 
 func (b *ACR1555BLE) Connect(ctx context.Context, protocol Protocol) (_ *Card, err error) {
-	defer deferWrap(&err)
+	defer rfid.DeferWrap(ctx, &err)
 
 	c := &Card{
 		b:        b,
@@ -42,14 +43,15 @@ func (b *ACR1555BLE) Connect(ctx context.Context, protocol Protocol) (_ *Card, e
 }
 
 func (c *Card) Close() (err error) {
-	defer deferWrap(&err)
+	ctx := context.Background()
+	defer rfid.DeferWrap(ctx, &err)
 
-	_, err = c.b.ICCPowerOff(context.Background(), c.sam)
+	_, err = c.b.ICCPowerOff(ctx, c.sam)
 	return
 }
 
 func (c *Card) Reconnect(ctx context.Context) (err error) {
-	defer deferWrap(&err)
+	defer rfid.DeferWrap(ctx, &err)
 
 	_, err = c.b.ICCPowerOff(ctx, c.sam)
 	if err != nil {
@@ -84,7 +86,7 @@ func (c *Card) DeviceName() string {
 }
 
 func (c *Card) Control(ctx context.Context, code uint16, data []byte) (_ []byte, err error) {
-	defer deferWrap(&err)
+	defer rfid.DeferWrap(ctx, &err)
 
 	switch code {
 	case CtlCodePcToRdrEscape:
@@ -96,7 +98,7 @@ func (c *Card) Control(ctx context.Context, code uint16, data []byte) (_ []byte,
 }
 
 func (c *Card) Exchange(ctx context.Context, capdu []byte) (_ []byte, err error) {
-	defer deferWrap(&err)
+	defer rfid.DeferWrap(ctx, &err)
 
 	return c.b.XfrBlock(ctx, c.sam, 0, capdu)
 }

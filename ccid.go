@@ -1,9 +1,11 @@
 package acr1555ble
 
 import (
+	"context"
 	"encoding"
 	"encoding/binary"
 	"errors"
+	"github.com/nvx/go-rfid"
 )
 
 type ccidMessageType byte
@@ -44,7 +46,7 @@ var (
 )
 
 func (c ccidMessage) MarshalBinary() (_ []byte, err error) {
-	defer deferWrap(&err)
+	defer rfid.DeferWrap(context.Background(), &err)
 
 	if len(c.data) > 0xFFFFFF {
 		err = errors.New("data too large")
@@ -79,7 +81,7 @@ func (c ccidMessage) MarshalBinary() (_ []byte, err error) {
 }
 
 func (c *ccidMessage) UnmarshalBinary(data []byte) (err error) {
-	defer deferWrap(&err)
+	defer rfid.DeferWrap(context.Background(), &err)
 
 	if len(data) < 10 {
 		err = errors.New("message too short")
