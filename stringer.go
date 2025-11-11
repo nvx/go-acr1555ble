@@ -142,10 +142,11 @@ const _ICCStatus_name = "ICCStatusRunningICCStatusInactiveICCStatusAbsent"
 var _ICCStatus_index = [...]uint8{0, 16, 33, 48}
 
 func (i ICCStatus) String() string {
-	if i >= ICCStatus(len(_ICCStatus_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_ICCStatus_index)-1 {
 		return "ICCStatus(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _ICCStatus_name[_ICCStatus_index[i]:_ICCStatus_index[i+1]]
+	return _ICCStatus_name[_ICCStatus_index[idx]:_ICCStatus_index[idx+1]]
 }
 func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
@@ -162,10 +163,11 @@ const _ClockStatus_name = "ClockStatusRunningClockStatusStoppedLClockStatusStopp
 var _ClockStatus_index = [...]uint8{0, 18, 37, 56, 81}
 
 func (i ClockStatus) String() string {
-	if i >= ClockStatus(len(_ClockStatus_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_ClockStatus_index)-1 {
 		return "ClockStatus(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _ClockStatus_name[_ClockStatus_index[i]:_ClockStatus_index[i+1]]
+	return _ClockStatus_name[_ClockStatus_index[idx]:_ClockStatus_index[idx+1]]
 }
 func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
@@ -185,11 +187,11 @@ const _ErrorCode_name = "ErrorCodeChecksumErrorCodeTimeoutErrorCodeCommandErrorC
 var _ErrorCode_index = [...]uint8{0, 17, 33, 49, 70, 88, 108, 134}
 
 func (i ErrorCode) String() string {
-	i -= 1
-	if i >= ErrorCode(len(_ErrorCode_index)-1) {
-		return "ErrorCode(" + strconv.FormatInt(int64(i+1), 10) + ")"
+	idx := int(i) - 1
+	if i < 1 || idx >= len(_ErrorCode_index)-1 {
+		return "ErrorCode(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _ErrorCode_name[_ErrorCode_index[i]:_ErrorCode_index[i+1]]
+	return _ErrorCode_name[_ErrorCode_index[idx]:_ErrorCode_index[idx+1]]
 }
 func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
@@ -205,8 +207,9 @@ const _PowerSelect_name = "PowerSelectAutomaticPowerSelect5vPowerSelect3v"
 var _PowerSelect_index = [...]uint8{0, 20, 33, 46}
 
 func (i PowerSelect) String() string {
-	if i >= PowerSelect(len(_PowerSelect_index)-1) {
+	idx := int(i) - 0
+	if i < 0 || idx >= len(_PowerSelect_index)-1 {
 		return "PowerSelect(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _PowerSelect_name[_PowerSelect_index[i]:_PowerSelect_index[i+1]]
+	return _PowerSelect_name[_PowerSelect_index[idx]:_PowerSelect_index[idx+1]]
 }

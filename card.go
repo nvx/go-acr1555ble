@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/nvx/go-rfid"
+	"io"
 )
 
 const (
@@ -24,6 +25,12 @@ type Card struct {
 	protocol Protocol
 	atr      []byte
 }
+
+var (
+	_ rfid.Exchanger        = (*Card)(nil)
+	_ rfid.SmartCardControl = (*Card)(nil)
+	_ io.Closer             = (*Card)(nil)
+)
 
 func (b *ACR1555BLE) Connect(ctx context.Context, protocol Protocol) (_ *Card, err error) {
 	defer rfid.DeferWrap(ctx, &err)
