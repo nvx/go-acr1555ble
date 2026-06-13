@@ -4,41 +4,30 @@ import (
 	"context"
 	"errors"
 	"github.com/nvx/go-rfid"
-	"io"
-)
-
-const (
-	CtlCodePcToRdrEscape uint16 = 3500
-)
-
-type Protocol int
-
-const (
-	ProtocolT0 Protocol = iota
-	ProtocolT1
-	ProtocolPICC
+	"github.com/nvx/go-rfid/ccid"
 )
 
 type Card struct {
 	b        *ACR1555BLE
-	sam      bool
-	protocol Protocol
+	slot     byte
+	protocol ccid.Protocol
 	atr      []byte
 }
 
 var (
-	_ rfid.Exchanger        = (*Card)(nil)
-	_ rfid.SmartCardControl = (*Card)(nil)
-	_ io.Closer             = (*Card)(nil)
+	_ rfid.PCSC = (*Card)(nil)
 )
 
-func (b *ACR1555BLE) Connect(ctx context.Context, protocol Protocol) (_ *Card, err error) {
+func (b *ACR1555BLE) Connect(ctx context.Context, protocol ccid.Protocol) (_ *Card, err error) {
 	defer rfid.DeferWrap(ctx, &err)
 
 	c := &Card{
 		b:        b,
-		sam:      protocol != ProtocolPICC,
 		protocol: protocol,
+	}
+
+	if protocol != ccid.ProtocolPICC {
+		c.slot = 0x01
 	}
 
 	err = c.Reconnect(ctx)
@@ -53,28 +42,41 @@ func (c *Card) Close() (err error) {
 	ctx := context.Background()
 	defer rfid.DeferWrap(ctx, &err)
 
-	_, err = c.b.ICCPowerOff(ctx, c.sam)
+	_, err = c.b.ICCPowerOff(ctx, c.slot)
 	return
 }
 
 func (c *Card) Reconnect(ctx context.Context) (err error) {
 	defer rfid.DeferWrap(ctx, &err)
 
-	_, err = c.b.ICCPowerOff(ctx, c.sam)
+	_, err = c.b.ICCPowerOff(ctx, c.slot)
 	if err != nil {
 		return
 	}
 
-	c.atr, err = c.b.ICCPowerOn(ctx, c.sam, PowerSelectAutomatic)
+	c.atr, err = c.b.ICCPowerOn(ctx, c.slot, ccid.PowerSelectAutomatic)
 	if err != nil {
 		return
 	}
 
-	if c.sam {
-		err = c.b.SetParameters(ctx, c.sam, c.protocol == ProtocolT1, 0x96, 0x10, 0x00, 0x55, 0x00, 0xFE)
+	var atr rfid.ATR
+	err = atr.UnmarshalBinary(c.atr)
+	if err != nil {
+		return
+	}
+
+	switch c.protocol {
+	case ccid.ProtocolT0:
+		err = c.b.SetParametersT0(ctx, c.slot, atr.FiDi, atr.GuardTime, atr.T0WI, atr.StopClock)
 		if err != nil {
 			return
 		}
+	case ccid.ProtocolT1:
+		err = c.b.SetParametersT1(ctx, c.slot, atr.FiDi, atr.GuardTime, atr.T1Waiting, atr.StopClock, atr.T1IFSC, 0x00, atr.T1CRC)
+		if err != nil {
+			return
+		}
+	default:
 	}
 
 	return nil
@@ -85,19 +87,19 @@ func (c *Card) ATR() ([]byte, error) {
 }
 
 func (c *Card) DeviceName() string {
-	if c.sam {
-		return "ACS ACR1552 1S CL Reader SAM 0"
-	} else {
+	if c.protocol == ccid.ProtocolPICC {
 		return "ACS ACR1552 1S CL Reader PICC 0"
 	}
+
+	return "ACS ACR1552 1S CL Reader SAM 0"
 }
 
 func (c *Card) Control(ctx context.Context, code uint16, data []byte) (_ []byte, err error) {
 	defer rfid.DeferWrap(ctx, &err)
 
 	switch code {
-	case CtlCodePcToRdrEscape:
-		return c.b.Escape(ctx, c.sam, data)
+	case rfid.CtlCodePcToRdrEscape:
+		return c.b.Escape(ctx, c.slot, data)
 	default:
 		err = errors.New("unsupported control code")
 		return
@@ -107,5 +109,5 @@ func (c *Card) Control(ctx context.Context, code uint16, data []byte) (_ []byte,
 func (c *Card) Exchange(ctx context.Context, capdu []byte) (_ []byte, err error) {
 	defer rfid.DeferWrap(ctx, &err)
 
-	return c.b.XfrBlock(ctx, c.sam, 0, capdu)
+	return c.b.XfrBlockExtendedAPDU(ctx, c.slot, 0, capdu)
 }
